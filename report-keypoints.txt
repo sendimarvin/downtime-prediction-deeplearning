@@ -1,0 +1,107 @@
+
+Report should at least include:
+
+- Brief introduction about the problem you are solving
+
+    1.Using haproxy traffic load balancer logs to predict downtime of endpoints
+    2.Companies world wide suffer from downtimes
+    3. Proposing a deep learning model to predict donwtime
+
+- Methods used (including details about datasets used)
+  
+  1. In project proposal I suggested using apache2 forward proxy logs but these had few features i.e 
+
+  233.223.117.90 - - [27/Dec/2037:12:00:00 +0530] "DELETE /usr/admin HTTP/1.0" 502 4963 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4380.0 Safari/537.36 Edg/89.0.759.0" 45
+
+    but the haproxy log is mure superior to apache log in that it provides more metrics/features to help improve the deep leanring model genereraization
+     i.e
+
+     Jun  6 12:49:08 interswitch-virtual-machine haproxy[3732]: 102.85.219.244:24836 [06/Jun/2023:12:48:38.921] www-https~ api_backend/api_webserver5 111/0/1/29210/29322 200 662 - - ---- 4047/4047/307/72/0 0/0 "POST /api/v1A/svapayments/validateCustomer HTTP/1.1"
+
+    This is a custom/private dataset that I obtained from my Company. i.e a leading fintech in uganda
+
+    The dataset is of logs for over a year but due to my machine limitations, I could not ingest the whole dataset since the model was required to be run multiple times and there was not enough training time and hardware /gpu
+
+    I limitted the model to 1 week data set of shape 33 * 21 millions
+
+
+    I performed data cleaning by:-
+        1.creating helper functions to reduce http response codes to represent a binary prediction i.e 500 range to mean downtime and 200 to mean uptime
+        this was arbitualily chosen bcause of a known reason i.e when the system is down, the http response code is 504 which is a gateway timeout
+         records with values out side 200 and 500 ranges were considered to be noise and dropped
+
+        2. Data was  read-line by line and parse into a regular expression to extract  the fields: 
+        timestamp, day_of_week, hour, server, client_ip, client_port, frontend, backend, backendservername, timing, http_status
+        bytes_read, request_cookie, response_cookie, termination_state, act_conn, fe_conn, be_conn, srv_conn, act_time
+        fe_time, be_time, srv_time, total_time, act_sess, fe_sess, be_sess, srv_sess, retries, http_method, endpoint,
+        http_version (be sure to define these feautures)
+
+        4.  I performed features engineering to 
+            The time stamp was used to get other features from the data such as day of week, hour of day since this is important informationa and correlates to a downtime trend
+
+            
+        3. also there a endpoints with slugs i.e varying paths pasing on the user data these to had to be normalised
+
+        i.e /api/v2/quickteller/agent/accountBalance/{useraccount} to /api/v2/quickteller/agent/accountBalance/
+
+
+- Dealing with Categorical values
+    1. when creating the notebook, I worked on a small dataset and I was envisioning using one hot encoding (which worked well in small dataset but failed to work on millions of records due to memory constraings when traversing the dataset)
+    I hopped onto a different techinique i.e  FeatureHasher using n features but this too failed since it drastically increases the dimentionality of the data and I had hard ware constraints running it on the 1 weke dataset
+    That is how I settled with label_encoder that had a trade off of introducing an arbitrary ordinal relationship between categories
+
+
+Model selection
+    1. Keras
+
+    It is a feedforward neural network commonly referred to as a Multi-Layer Perceptron (MLP)
+
+    Model architecture
+
+    # multiple hidden layers
+    dense1 = Dense(64, activation='relu')(inputs)
+    dropout1 = Dropout(0.2)(dense1)
+    dense2 = Dense(32, activation='relu')(dropout1)
+    dropout2 = Dropout(0.2)(dense2)
+    dense3 = Dense(16, activation='relu')(dropout2)
+
+    # Add the output layer
+    output = Dense(1, activation='sigmoid')(dense3)
+
+Hyper parameter tuniing
+    1. I had to Increase the complexity of the model i.e the number of hidden layers to increase the performance of the Model
+    2.Experiment with different activation functions: This involved a try and evaluate model performance, i.e conversion rate, loss and accuracy
+    3.Use regularization techniques: Regularization techniques like dropout: to prevent the model from over fitting and improve on generalization
+    4. Increase the batch size: more stable gradients during training, which resulted in better convergence
+    5.Adjust the learning rate and optimizer
+    6. Data Split ratiol was 80:10:10 (train:test:validation)
+
+    BATCH_SIZE = 2
+    EPOCHS = 90
+    INIT_LEARNING_RATE = 0.0001
+    dense_units = 50
+    activation_func = 'relu'
+    activation_func_out='sigmoid'
+    loss = 'binary_crossentropy'
+
+   
+- Results and Evaluation (of your model/methods)
+
+- Discussion of the results 
+
+In other approaches to predicting downtime onei.e 
+
+One approach that has been used in previous studies is to use supervised learning
+algorithms to predict the likelihood of a downtime event based on historical data. For
+example, in a study by Wu et al. (2015), a decision tree algorithm was used to
+predict server downtime based on several input features, such as CPU usage,
+memory usage, and network traffic. The algorithm achieved an accuracy of 83% in
+predicting downtime events, with a false positive rate of 10%
+
+Deep learning has also been used for predicting application downtime in some
+recent studies. For example, in a study a deep learning model based on a
+convolutional neural network (CNN) was used to predict server downtime based on
+network traffic data. The model achieved an accuracy of 94% in predicting downtime
+events, with a false positive rate of 2%.
+
+Disclaimer, this model results may vary basing on the environment i.e in there is need to retrain the model using organizational specifc metrics
